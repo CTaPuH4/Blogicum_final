@@ -1,24 +1,13 @@
-from django.db import models
 from django.contrib.auth import get_user_model
-from django.utils import timezone
+from django.db import models
+
+from .constants import (
+    TITLE_MAX_LENGTH, TITLE_SHOWING_LENGTH, TEXT_SHOWING_LENGTH
+)
+from .managers import PublishedManager
 
 
 User = get_user_model()
-TITLE_MAX_LENGTH = 256
-TITLE_SHOWING_LENGTH = 50
-
-
-class PublishedManager(models.Manager):
-    def published(self):
-        return self.select_related(
-            'category',
-            'author',
-            'location',
-        ).filter(
-            is_published=True,
-            category__is_published=True,
-            pub_date__lte=timezone.now(),
-        )
 
 
 class PublishedModel(models.Model):
@@ -104,29 +93,39 @@ class Post(PublishedModel, CreatedAtModel):
     objects = models.Manager()
     published_objects = PublishedManager()
     image = models.ImageField('Фото', upload_to='post_images', blank=True)
-    comment_count = models.PositiveIntegerField(
-        'Количество комментариев', default=0
-    )
 
     class Meta:
+        ordering = ('-pub_date',)
         verbose_name = 'публикация'
         verbose_name_plural = 'Публикации'
         default_related_name = 'posts'
-        ordering = ('-pub_date',)
 
     def __str__(self):
         return self.title[:TITLE_SHOWING_LENGTH]
 
 
-class Comment(models.Model):
-    text = models.TextField('Текст поздравления')
+class Comment(CreatedAtModel, models.Model):
+    text = models.TextField('Текст комментария')
     post = models.ForeignKey(
         Post,
         on_delete=models.CASCADE,
         related_name='comments',
+        verbose_name='Пост',
     )
-    created_at = models.DateTimeField(auto_now_add=True)
-    author = models.ForeignKey(User, on_delete=models.CASCADE)
+    author = models.ForeignKey(
+        User,
+        on_delete=models.CASCADE,
+        related_name='comments',
+        verbose_name='Автор',
+    )
 
     class Meta:
         ordering = ('created_at',)
+        verbose_name = 'комментарий'
+        verbose_name_plural = 'Комментарии'
+
+    def __str__(self):
+        return (
+            f'{self.author.username} - {self.text[:TEXT_SHOWING_LENGTH]} '
+            + f'({self.post.title})'
+        )

@@ -12,7 +12,7 @@ urlpatterns = [
     path('category/<slug:slug>/',
          views.category_detail,
          name='category_posts'),
-    path('profile/<slug:username>/',
+    path('profile/<str:username>/',
          views.profile_detail,
          name='profile'),
     path('profie/edit/',

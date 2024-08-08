@@ -2,23 +2,18 @@ from django.contrib.auth.decorators import login_required
 from django.contrib.auth.models import User
 from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
 from django.core.paginator import Paginator
+from django.db.models import Count
+from django.http import Http404
 from django.shortcuts import get_object_or_404, render, redirect
+from django.urls import reverse, reverse_lazy
 from django.views.generic import (
     CreateView, DeleteView, DetailView, ListView, UpdateView
 )
-from django.http import Http404
-from django.urls import reverse_lazy
 
+from .constants import POSTS_ON_PAGE
 from .forms import CommentForm, PostForm, UserForm
+from .mixins import OnlyAuthorMixin
 from .models import Category, Comment, Post
-
-POSTS_ON_PAGE = 10
-
-
-class OnlyAuthorMixin(LoginRequiredMixin, UserPassesTestMixin):
-    def test_func(self):
-        object = self.get_object()
-        return object.author == self.request.user
 
 
 class CommentUpdateView(OnlyAuthorMixin, UpdateView):
@@ -27,7 +22,7 @@ class CommentUpdateView(OnlyAuthorMixin, UpdateView):
     template_name = 'blog/comment.html'
 
     def get_success_url(self):
-        return reverse_lazy(
+        return reverse(
             'blog:post_detail', kwargs={'pk': self.object.post.pk}
         )
 
@@ -37,10 +32,7 @@ class CommentDeleteView(OnlyAuthorMixin, DeleteView):
     template_name = 'blog/comment.html'
 
     def get_success_url(self):
-        post = self.object.post
-        post.comment_count -= 1
-        post.save()
-        return reverse_lazy(
+        return reverse(
             'blog:post_detail', kwargs={'pk': self.object.post.pk}
         )
 
@@ -54,7 +46,7 @@ class UserUpdateView(LoginRequiredMixin, UpdateView):
         return self.request.user
 
     def get_success_url(self):
-        return reverse_lazy(
+        return reverse(
             'blog:profile', kwargs={'username': self.request.user.username}
         )
 
@@ -77,7 +69,7 @@ class PostUpdateView(OnlyAuthorMixin, UpdateView):
     template_name = 'blog/create.html'
 
     def get_success_url(self):
-        return reverse_lazy(
+        return reverse(
             'blog:post_detail', kwargs={'pk': self.object.pk}
         )
 
@@ -92,7 +84,9 @@ class PostListView(ListView):
     template_name = 'blog/index.html'
 
     def get_queryset(self):
-        return Post.published_objects.published()
+        return (Post.published_objects.published().annotate(
+            comment_count=Count('comments')
+        )).order_by('-pub_date',)
 
 
 class PostDetailView(UserPassesTestMixin, DetailView):
@@ -101,11 +95,8 @@ class PostDetailView(UserPassesTestMixin, DetailView):
 
     def test_func(self):
         object = self.get_object()
-        if (object not in Post.published_objects.published()
-           and object.author != self.request.user):
-            return False
-        else:
-            return True
+        return not (object not in Post.published_objects.published()
+                    and object.author != self.request.user)
 
     def handle_no_permission(self):
         raise Http404
@@ -129,7 +120,7 @@ class PostCreateView(LoginRequiredMixin, CreateView):
         return super().form_valid(form)
 
     def get_success_url(self):
-        return reverse_lazy(
+        return reverse(
             'blog:profile', kwargs={'username': self.object.author.username}
         )
 
@@ -138,10 +129,14 @@ def category_detail(request, slug):
     category = get_object_or_404(
         Category, slug=slug, is_published=True,
     )
-    posts = Post.published_objects.published().filter(category=category)
-    paginator = Paginator(posts, POSTS_ON_PAGE)
-    page_number = request.GET.get('page')
-    page_obj = paginator.get_page(page_number)
+    posts = Post.published_objects.published().filter(
+        category=category
+    ).annotate(
+        comment_count=Count('comments')
+    ).order_by('-pub_date',)
+    page_obj = Paginator(posts, POSTS_ON_PAGE).get_page(
+        request.GET.get('page')
+    )
     context = {
         'category': category,
         'page_obj': page_obj
@@ -153,10 +148,21 @@ def profile_detail(request, username):
     profile = get_object_or_404(
         User, username=username
     )
-    posts = Post.published_objects.filter(author=profile)
-    paginator = Paginator(posts, POSTS_ON_PAGE)
-    page_number = request.GET.get('page')
-    page_obj = paginator.get_page(page_number)
+    if request.user == profile:
+        posts = Post.objects.filter(
+            author=profile
+        ).annotate(
+            comment_count=Count('comments')
+        ).order_by('-pub_date')
+    else:
+        posts = Post.published_objects.published().filter(
+            author=profile
+        ).annotate(
+            comment_count=Count('comments')
+        ).order_by('-pub_date')
+    page_obj = Paginator(posts, POSTS_ON_PAGE).get_page(
+        request.GET.get('page')
+    )
     context = {
         'profile': profile,
         'page_obj': page_obj
@@ -173,6 +179,4 @@ def add_comment(request, pk):
         comment.author = request.user
         comment.post = post
         comment.save()
-        post.comment_count = post.comments.count()
-        post.save()
     return redirect('blog:post_detail', pk=pk)

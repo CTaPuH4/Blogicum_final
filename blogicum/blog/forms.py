@@ -13,8 +13,7 @@ class UserForm(forms.ModelForm):
 class PostForm(forms.ModelForm):
     class Meta:
         model = Post
-        fields = '__all__'
-        exclude = ('author', 'comment_count')
+        exclude = ('author',)
         widgets = {
             'pub_date': forms.DateTimeInput(
                 attrs={'type': 'datetime-local'}, format='%Y-%m-%dT%H:%M'
@@ -23,6 +22,11 @@ class PostForm(forms.ModelForm):
 
 
 class CommentForm(forms.ModelForm):
+    def __init__(self, *args, **kwargs):
+        super(CommentForm, self).__init__(*args, **kwargs)
+        self.fields['text'].widget.attrs['cols'] = 10
+        self.fields['text'].widget.attrs['rows'] = 5
+
     class Meta:
         model = Comment
         fields = ('text',)

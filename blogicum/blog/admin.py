@@ -1,8 +1,9 @@
 from django.contrib import admin
 
-from .models import Category, Location, Post
+from .models import Category, Comment, Location, Post
 
 
+@admin.register(Post)
 class PostAdmin(admin.ModelAdmin):
     empty_value_display = 'Планета Земля'
     list_display = (
@@ -20,6 +21,7 @@ class PostAdmin(admin.ModelAdmin):
     )
 
 
+@admin.register(Category)
 class CategoryAdmin(admin.ModelAdmin):
     list_display = (
         'title',
@@ -30,6 +32,17 @@ class CategoryAdmin(admin.ModelAdmin):
     )
 
 
-admin.site.register(Post, PostAdmin)
-admin.site.register(Category, CategoryAdmin)
+@admin.register(Comment)
+class CommentAdmin(admin.ModelAdmin):
+    list_display = (
+        'text',
+        'post',
+        'author'
+    )
+    list_editable = (
+        'post',
+        'author'
+    )
+
+
 admin.site.register(Location)
