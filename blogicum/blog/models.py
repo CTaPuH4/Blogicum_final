@@ -127,5 +127,5 @@ class Comment(CreatedAtModel, models.Model):
     def __str__(self):
         return (
             f'{self.author.username} - {self.text[:TEXT_SHOWING_LENGTH]} '
-            + f'({self.post.title})'
+            f'({self.post.title})'
         )

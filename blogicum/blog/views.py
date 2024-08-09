@@ -153,13 +153,23 @@ def profile_detail(request, username):
             author=profile
         ).annotate(
             comment_count=Count('comments')
-        ).order_by('-pub_date')
+        ).order_by(
+            '-pub_date'
+        ).select_related(
+            'category',
+            'location',
+        )
     else:
         posts = Post.published_objects.published().filter(
             author=profile
         ).annotate(
             comment_count=Count('comments')
-        ).order_by('-pub_date')
+        ).order_by(
+            '-pub_date'
+        ).select_related(
+            'category',
+            'location',
+        )
     page_obj = Paginator(posts, POSTS_ON_PAGE).get_page(
         request.GET.get('page')
     )
