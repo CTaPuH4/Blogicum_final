@@ -57,5 +57,7 @@ python manage.py migrate
 python manage.py runserver
 ```
 
+---
+
 ### Авторы
 Nizhelskiy Ilya (CTaPuH4) - https://github.com/CTaPuH4
